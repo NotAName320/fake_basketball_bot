@@ -57,13 +57,25 @@ async def login():
 
     logger.info('Opening configuration.json...')
     # Opens configuration.json and extracts bot settings
-    with open('configuration.json', 'r') as configuration_file:
-        configuration = json.load(configuration_file)
-    logger.info('configuration.json found!')
+    try:
+        with open('configuration.json', 'r') as configuration_file:
+            configuration = json.load(configuration_file)
+        prefix = configuration.pop('prefix')
+        token = configuration.pop('token')
+    except FileNotFoundError:
+        logger.info('configuration.json not found, generating...')
+        with open('configuration.json', 'w') as configuration_file:
+            configuration_file.write(json.dumps({'prefix': '!', 'token': ''}, indent=2))
+        return print('Configuration file not found! Generated new config at configuration.json. Please fill in token.', file=sys.stderr)
+    except KeyError:
+        logger.critical('configuration.json is invalid! Make sure all required fields are filled.')
+        return print('Invalid configuration file! Please fix configuration.json or delete it to regenerate.', file=sys.stderr)
+    else:
+        logger.info('configuration.json found!')
 
     # Initializes config objects and passes them to bot
     activity = discord.Activity(type=discord.ActivityType.listening, name='numbers in your games!')
-    client = Bot(command_prefix=configuration['prefix'], activity=activity, help_command=commands.MinimalHelpCommand(), logger=logger)
+    client = Bot(command_prefix=prefix, activity=activity, help_command=commands.MinimalHelpCommand(), logger=logger)
 
     @client.event
     async def on_ready():
@@ -96,12 +108,14 @@ async def login():
         else:
             formatted_error = ''.join(traceback.format_exception(type(error), error, tb=error.__traceback__))
             logger.error(formatted_error)
+
             print(f'Exception in command {ctx.command}:', file=sys.stderr)
             traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+
             embed = discord.Embed(color=0xff0000, title='Error', description=f'```py\n{formatted_error}\n```')
             app_info = await client.application_info()
             embed.set_footer(text=f'Please contact {app_info.owner} for help.')
-            await ctx.send(embed=embed)
+            await ctx.reply(embed=embed)
 
     @client.event
     async def on_error(event, *args):
@@ -119,7 +133,10 @@ async def login():
         logger.info('Bot reloaded!')
 
     try:
-        await client.start(configuration['token'])
+        await client.start(token)
+    except discord.errors.LoginFailure:
+        print('Invalid token!', file=sys.stderr)
+        await client.close()
     except KeyboardInterrupt:
         await client.close()
 
