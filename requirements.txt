@@ -1,2 +1,2 @@
 aiosqlite
-discord
+discord.py
