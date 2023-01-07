@@ -18,6 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
 import json
+import logging
+import sys
+import traceback
 
 import discord
 from discord.ext import commands
@@ -27,18 +30,93 @@ from bot import Bot
 
 async def login():
     """Logs into Discord and database and runs the bot."""
+    # Set up logging
+    logger = logging.Logger('fake_basketball_bot')
+    logger.setLevel(logging.INFO)
+
+    discord_logger = logging.getLogger('discord')
+    discord_logger.setLevel(logging.INFO)
+
+    handler = logging.FileHandler(filename='bot.log', encoding='utf-8', mode='w')
+    handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+    logger.addHandler(handler)
+    discord_logger.addHandler(handler)
+
+    # Override default exception hook
+    def excepthook(e_type, e_value, e_traceback):
+        if issubclass(e_type, KeyboardInterrupt):
+            logger.info("KeyboardInterrupt detected, stopping!")
+            print("\nStopping!", file=sys.stderr)
+            return
+        logger.critical("".join(traceback.format_exception(e_type, e_value, tb=e_traceback)))
+        sys.__excepthook__(e_type, e_value, e_traceback)
+
+    sys.excepthook = excepthook
+
+    logger.info("Starting bot...")
+
+    logger.info("Opening configuration.json...")
+    # Opens configuration.json and extracts bot settings
     with open('configuration.json', 'r') as configuration_file:
         configuration = json.load(configuration_file)
-    client = Bot(command_prefix=configuration['prefix'], help_command=commands.MinimalHelpCommand())
+    logger.info("configuration.json found!")
+
+    # Initializes config objects and passes them to bot
+    activity = discord.Activity(type=discord.ActivityType.listening, name='numbers in your games!')
+    client = Bot(command_prefix=configuration['prefix'], activity=activity, help_command=commands.MinimalHelpCommand(), logger=logger)
 
     @client.event
     async def on_ready():
-        # Saves connection and info to logs
+        """Confirms and logs a connection."""
+        logger.info(f"Connected to Discord as {client.user} (ID: {client.user.id})")
         print(f"Logged in as\n{client.user}\n{client.user.id}")
 
+    @client.event
+    async def on_command(ctx):
+        logger.debug(f"{ctx.author} called command {ctx.command.name} with args {ctx.args} in channel {ctx.message.channel.id}")
+
+    @client.event
+    async def on_command_completion(ctx):
+        logger.debug(f"Command {ctx.command.name} called by {ctx.author} completed without uncaught errors")
+
+    @client.event
+    async def on_command_error(ctx, error):
+        """Basic error handling, including generic messages to send for common errors."""
+        error: Exception = getattr(error, "original", error)
+        if ctx.command and ctx.command.has_error_handler():
+            return
+
+        if isinstance(error, commands.CommandNotFound):
+            return await ctx.reply(f"Error: Your command was not recognized. Please refer to {client.command_prefix}help for more info.")
+        if isinstance(error, commands.MissingRequiredArgument):
+            return await ctx.reply("Error: You did not provide the required argument(s). Make sure you typed the command correctly.")
+        if isinstance(error, commands.CheckFailure):
+            return await ctx.reply("Error: You do not have permission to use this command.")
+
+        else:
+            formatted_error = "".join(traceback.format_exception(type(error), error, tb=error.__traceback__))
+            logger.error(formatted_error)
+            print(f"Exception in command {ctx.command}:", file=sys.stderr)
+            traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+            embed = discord.Embed(color=0xff0000, title="Error", description=f"```py\n{formatted_error}\n```")
+            app_info = await client.application_info()
+            embed.set_footer(text=f"Please contact {app_info.owner} for help.")
+            await ctx.send(embed=embed)
+
+    @client.event
+    async def on_error(event, *args):
+        exception = traceback.format_exc()
+        print(f"Exception in {event}:", file=sys.stderr)
+        print(exception, file=sys.stderr)
+        logging.error(exception)
+
     @client.command()
-    async def ping(ctx):
-        return await ctx.reply('Pong!')
+    @commands.is_owner()
+    async def reload(ctx):
+        """Reloads the bot's extensions."""
+        logger.info("Reload command called! Reloading bot...")
+        await ctx.reply('This will do something in the future. For now, test to see that it\'s actually logging something!')
+        logger.info("Bot reloaded!")
 
     try:
         await client.start(configuration['token'])
