@@ -1,3 +1,5 @@
+*.db
+*.db-journal
 *.log
 configuration.json
 
