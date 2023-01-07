@@ -29,5 +29,5 @@ class Bot(commands.Bot):
         intents.members, intents.message_content = True, True
 
         # self.db: Connection = kwargs.pop("db")
-        # self.logger = kwargs.pop("logger")
+        self.logger = kwargs.pop('logger')
         super().__init__(**kwargs, allowed_mentions=allowed_mentions, intents=intents)
