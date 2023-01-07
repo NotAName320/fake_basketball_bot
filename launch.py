@@ -63,7 +63,7 @@ async def login():
         prefix = configuration.pop('prefix')
         token = configuration.pop('token')
     except FileNotFoundError:
-        logger.info('configuration.json not found, generating...')
+        logger.critical('configuration.json not found, generating...')
         with open('configuration.json', 'w') as configuration_file:
             configuration_file.write(json.dumps({'prefix': '!', 'token': ''}, indent=2))
         return print('Configuration file not found! Generated new config at configuration.json. Please fill in token.', file=sys.stderr)
