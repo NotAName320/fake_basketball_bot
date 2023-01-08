@@ -126,7 +126,7 @@ async def login():
             exception = traceback.format_exc()
             print(f'Exception in {event}:', file=sys.stderr)
             print(exception, file=sys.stderr)
-            logging.error(exception)
+            logger.error(exception)
 
         @client.command()
         @commands.is_owner()
