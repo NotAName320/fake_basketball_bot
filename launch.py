@@ -22,6 +22,7 @@ import logging
 import sys
 import traceback
 
+import aiosqlite
 import discord
 from discord.ext import commands
 
@@ -55,90 +56,92 @@ async def login():
 
     logger.info('Starting bot...')
 
-    logger.info('Opening configuration.json...')
     # Opens configuration.json and extracts bot settings
+    logger.info('Opening configuration.json...')
     try:
         with open('configuration.json', 'r') as configuration_file:
             configuration = json.load(configuration_file)
         prefix = configuration.pop('prefix')
+        database_path = configuration.pop('db')
         token = configuration.pop('token')
     except FileNotFoundError:
         logger.critical('configuration.json not found, generating...')
         with open('configuration.json', 'w') as configuration_file:
-            configuration_file.write(json.dumps({'prefix': '!', 'token': ''}, indent=2))
-        return print('Configuration file not found! Generated new config at configuration.json. Please fill in token.', file=sys.stderr)
+            configuration_file.write(json.dumps({'prefix': '!', 'db': '', 'token': ''}, indent=2))
+        return print('Configuration file not found! Generated new config at configuration.json. Please fill in token and db.', file=sys.stderr)
     except KeyError:
         logger.critical('configuration.json is invalid! Make sure all required fields are filled.')
         return print('Invalid configuration file! Please fix configuration.json or delete it to regenerate.', file=sys.stderr)
     else:
         logger.info('configuration.json found!')
 
-    # Initializes config objects and passes them to bot
-    activity = discord.Activity(type=discord.ActivityType.listening, name='numbers in your games!')
-    client = Bot(command_prefix=prefix, activity=activity, help_command=commands.MinimalHelpCommand(), logger=logger)
+    # Creates Bot object (finally!)
+    async with aiosqlite.connect(database=database_path) as db:  # for some reason just creating a cursor object and manually closing it isn't working.
+        activity = discord.Activity(type=discord.ActivityType.listening, name='numbers in your games!')
+        client = Bot(command_prefix=prefix, db=db, activity=activity, help_command=commands.MinimalHelpCommand(), logger=logger)
 
-    @client.event
-    async def on_ready():
-        """Confirms and logs a connection."""
-        logger.info(f'Connected to Discord as {client.user} (ID: {client.user.id})')
-        print(f'Logged in as\n{client.user}\n{client.user.id}')
+        # Set some handlers
+        @client.event
+        async def on_ready():
+            """Confirms and logs a connection."""
+            logger.info(f'Connected to Discord as {client.user} (ID: {client.user.id})')
+            print(f'Logged in as\n{client.user}\n{client.user.id}')
 
-    @client.event
-    async def on_command(ctx):
-        logger.debug(f'{ctx.author} called command {ctx.command.name} with args {ctx.args} in channel {ctx.message.channel.id}')
+        @client.event
+        async def on_command(ctx):
+            logger.debug(f'{ctx.author} called command {ctx.command.name} with args {ctx.args} in channel {ctx.message.channel.id}')
 
-    @client.event
-    async def on_command_completion(ctx):
-        logger.debug(f'Command {ctx.command.name} called by {ctx.author} completed without uncaught errors')
+        @client.event
+        async def on_command_completion(ctx):
+            logger.debug(f'Command {ctx.command.name} called by {ctx.author} completed without uncaught errors')
 
-    @client.event
-    async def on_command_error(ctx, error):
-        """Basic error handling, including generic messages to send for common errors."""
-        error: Exception = getattr(error, 'original', error)
-        if ctx.command and ctx.command.has_error_handler():
-            return
+        @client.event
+        async def on_command_error(ctx, error):
+            """Basic error handling, including generic messages to send for common errors."""
+            error: Exception = getattr(error, 'original', error)
+            if ctx.command and ctx.command.has_error_handler():
+                return
 
-        if isinstance(error, commands.CommandNotFound):
-            return await ctx.reply(f'Error: Your command was not recognized. Please refer to {client.command_prefix}help for more info.')
-        if isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.reply('Error: You did not provide the required argument(s). Make sure you typed the command correctly.')
-        if isinstance(error, commands.CheckFailure):
-            return await ctx.reply('Error: You do not have permission to use this command.')
+            if isinstance(error, commands.CommandNotFound):
+                return await ctx.reply(f'Error: Your command was not recognized. Please refer to {client.command_prefix}help for more info.')
+            if isinstance(error, commands.MissingRequiredArgument):
+                return await ctx.reply('Error: You did not provide the required argument(s). Make sure you typed the command correctly.')
+            if isinstance(error, commands.CheckFailure):
+                return await ctx.reply('Error: You do not have permission to use this command.')
 
-        else:
-            formatted_error = ''.join(traceback.format_exception(type(error), error, tb=error.__traceback__))
-            logger.error(formatted_error)
+            else:
+                formatted_error = ''.join(traceback.format_exception(type(error), error, tb=error.__traceback__))
+                logger.error(formatted_error)
 
-            print(f'Exception in command {ctx.command}:', file=sys.stderr)
-            traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+                print(f'Exception in command {ctx.command}:', file=sys.stderr)
+                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
 
-            embed = discord.Embed(color=0xff0000, title='Error', description=f'```py\n{formatted_error}\n```')
-            app_info = await client.application_info()
-            embed.set_footer(text=f'Please contact {app_info.owner} for help.')
-            await ctx.reply(embed=embed)
+                embed = discord.Embed(color=0xff0000, title='Error', description=f'```py\n{formatted_error}\n```')
+                app_info = await client.application_info()
+                embed.set_footer(text=f'Please contact {app_info.owner} for help.')
+                await ctx.reply(embed=embed)
 
-    @client.event
-    async def on_error(event, *args):
-        exception = traceback.format_exc()
-        print(f'Exception in {event}:', file=sys.stderr)
-        print(exception, file=sys.stderr)
-        logging.error(exception)
+        @client.event
+        async def on_error(event, *args):
+            exception = traceback.format_exc()
+            print(f'Exception in {event}:', file=sys.stderr)
+            print(exception, file=sys.stderr)
+            logging.error(exception)
 
-    @client.command()
-    @commands.is_owner()
-    async def reload(ctx):
-        """Reloads the bot's extensions."""
-        logger.info('Reload command called! Reloading bot...')
-        await ctx.reply('This will do something in the future. For now, test to see that it\'s actually logging something!')
-        logger.info('Bot reloaded!')
+        @client.command()
+        @commands.is_owner()
+        async def reload(ctx):
+            """Reloads the bot's extensions."""
+            logger.info('Reload command called! Reloading bot...')
+            await ctx.reply('This will do something in the future. For now, test to see that it\'s actually logging something!')
+            logger.info('Bot reloaded!')
 
-    try:
-        await client.start(token)
-    except discord.errors.LoginFailure:
-        print('Invalid token!', file=sys.stderr)
-        await client.close()
-    except KeyboardInterrupt:
-        await client.close()
+        try:
+            await client.start(token)
+        except discord.errors.LoginFailure:
+            print('Invalid token!', file=sys.stderr)
+        finally:
+            await client.close()
 
 
 if __name__ == '__main__':
