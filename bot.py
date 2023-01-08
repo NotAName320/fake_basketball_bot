@@ -1,5 +1,6 @@
 """
-Builds a Discord Bot with certain flags enabled, as needed by the Fake Basketball Bot.
+Builds a Discord Bot with certain flags enabled and a database
+connection, as needed by the Fake Basketball Bot.
 Copyright (C) 2022 Fake CBB Developers
 
 This program is free software: you can redistribute it and/or modify
@@ -28,6 +29,6 @@ class Bot(commands.Bot):
         intents = discord.Intents.default()
         intents.members, intents.message_content = True, True
 
-        # self.db: Connection = kwargs.pop("db")
+        self.db: Connection = kwargs.pop("db")
         self.logger = kwargs.pop('logger')
         super().__init__(**kwargs, allowed_mentions=allowed_mentions, intents=intents)
