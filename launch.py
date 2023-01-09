@@ -136,6 +136,7 @@ async def login():
             await ctx.reply('This will do something in the future. For now, test to see that it\'s actually logging something!')
             logger.info('Bot reloaded!')
 
+        await client.load_extension('cogs.team_management')
         try:
             await client.start(token)
         except discord.errors.LoginFailure:
