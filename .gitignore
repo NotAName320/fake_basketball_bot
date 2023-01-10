@@ -3,5 +3,6 @@
 *.log
 configuration.json
 
+__pycache__
 venv
 .idea
