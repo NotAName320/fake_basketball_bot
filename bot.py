@@ -37,4 +37,10 @@ class Bot(commands.Bot):
             return list(await self.db.execute_fetchall(*args))[0]
         self.fetchone = fetchone
 
+        async def fetchval(*args):
+            """Like fetchone, but returns the first value."""
+            if len(row := await self.fetchone(*args)):
+                return row[0]
+        self.fetchval = fetchval
+
         super().__init__(**kwargs, allowed_mentions=allowed_mentions, intents=intents)
