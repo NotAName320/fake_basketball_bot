@@ -131,7 +131,6 @@ async def login():
         @commands.is_owner()
         async def reload(ctx):
             """Reloads the bot's extensions."""
-            print(ctx.command.has_error_handler())
             logger.info('Reload command called! Reloading bot...')
             status_message = await ctx.reply('Reloading bot...')
             for extension in dict(client.extensions):  # create a copy of the mapping
