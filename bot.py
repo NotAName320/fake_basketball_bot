@@ -34,7 +34,7 @@ class Bot(commands.Bot):
 
         async def fetchone(*args):
             """Executes and returns the first of certain query to the database."""
-            return list((await self.db.execute_fetchall(*args)))[0]
+            return list(await self.db.execute_fetchall(*args))[0]
         self.fetchone = fetchone
 
         super().__init__(**kwargs, allowed_mentions=allowed_mentions, intents=intents)
