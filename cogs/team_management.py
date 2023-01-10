@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import asyncio
+from typing import Optional
+
 import discord
 from discord.ext import commands
 
@@ -32,12 +34,14 @@ class TeamManagement(commands.Cog, name='Team Management'):
 
     @commands.group()
     async def team(self, ctx, team_id: str):
-        team_id = team_id.lower()
-        if team_id in ['list']:
-            return await ctx.invoke(self.bot.get_command(f'team {team_id}'))
+        self.team_id = team_id.lower()
+        if self.team_id in ['list', 'create']:
+            # swap two fields
+            if len(ctx.message.content.split(' ')) > 2:
+                self.team_id = ctx.message.content.split(' ')[2].lower()
+            return await ctx.invoke(self.bot.get_command(f'team {team_id.lower()}'))
         if ctx.invoked_subcommand is None:
             return await ctx.reply(f'Please specify a command to perform. See `{self.bot.command_prefix}help team` for more info.')
-        self.team_id = team_id
 
     @team.command()
     async def info(self, ctx):
@@ -48,12 +52,13 @@ class TeamManagement(commands.Cog, name='Team Management'):
         c = discord.utils.get(ctx.guild.roles, name=f'{team[1]} {team[2]}') or 0
         if isinstance(c, discord.Role):
             c = c.color
-        embed = discord.Embed(title=f'{team[1]} Team Info', color=c)
-        embed.add_field(name='Name', value='None' if team[1] is None else team[1], inline=True)
-        embed.add_field(name='Mascot', value='None' if team[2] is None else team[2], inline=True)
-        embed.add_field(name='Coach', value='None' if team[3] is None else f'<@{team[3]}>', inline=True)
-        embed.add_field(name='Offense', value='None' if team[4] is None else ['5-Out', '4-Out', 'Iso'][team[4]], inline=True)
-        embed.add_field(name='Defense', value='None' if team[5] is None else ['1-3-1', 'Man', '2-3'][team[5]], inline=True)
+        embed = discord.Embed(title=f'{team[1] or "None"} Team Info', color=c)
+        embed.add_field(name='ID', value=self.team_id, inline=True)
+        embed.add_field(name='Name', value=team[1] or 'None', inline=True)
+        embed.add_field(name='Mascot', value=team[2] or 'None', inline=True)
+        embed.add_field(name='Coach', value=f'<@{team[3]}>' if team[3] else 'None', inline=True)
+        embed.add_field(name='Offense', value=['5-Out', '4-Out', 'Iso'][team[4]] if team[4] else 'None', inline=True)
+        embed.add_field(name='Defense', value=['1-3-1', 'Man', '2-3'][team[5]] if team[5] else 'None', inline=True)
         return await ctx.reply(embed=embed)
 
     @team.command(name='list')
@@ -88,10 +93,27 @@ class TeamManagement(commands.Cog, name='Team Management'):
                 i = len(team_pages.pages) - 1 if i == 0 else i - 1  # wraparound
             if user_reaction.emoji == '➡️':
                 i = 0 if i == len(team_pages.pages) - 1 else i + 1
-            embed = discord.Embed(title=f'Team ID List', description=team_pages.pages[i], color=0)
+            embed.description = (team_pages.pages[i])
             embed.set_footer(text=f'Page {i + 1} of {len(team_pages.pages)}')
             await message.edit(embed=embed)
             await user_reaction.remove(ctx.author)
+
+    @team.command(name='create')
+    async def team_create(self, ctx, team_id: Optional[str] = None):
+        team_id = team_id or self.team_id
+        print(team_id)
+        if int(await self.bot.fetchval('SELECT EXISTS(SELECT 1 FROM teams WHERE id = ?)', (team_id,))):
+            return await ctx.reply('Team with ID already exists.')
+        await self.bot.db.execute('INSERT INTO teams VALUES(?, NULL, NULL, NULL, NULL, NULL)', (team_id,))
+        await self.bot.db.commit()
+        embed = discord.Embed(title=f'None Team Info', color=0)
+        embed.add_field(name='ID', value=team_id, inline=True)
+        embed.add_field(name='Name', value='None', inline=True)
+        embed.add_field(name='Mascot', value='None', inline=True)
+        embed.add_field(name='Coach', value='None', inline=True)
+        embed.add_field(name='Offense', value='None', inline=True)
+        embed.add_field(name='Defense', value='None', inline=True)
+        return await ctx.reply(content='Team successfully created.', embed=embed)
 
 
 async def setup(bot: Bot):
