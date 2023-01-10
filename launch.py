@@ -109,17 +109,16 @@ async def login():
             if isinstance(error, commands.CheckFailure):
                 return await ctx.reply('Error: You do not have permission to use this command.')
 
-            else:
-                formatted_error = ''.join(traceback.format_exception(type(error), error, tb=error.__traceback__))
-                logger.error(formatted_error)
+            formatted_error = ''.join(traceback.format_exception(type(error), error, tb=error.__traceback__))
+            logger.error(formatted_error)
 
-                print(f'Exception in command {ctx.command}:', file=sys.stderr)
-                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+            print(f'Exception in command {ctx.command}:', file=sys.stderr)
+            traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
 
-                embed = discord.Embed(color=0xff0000, title='Error', description=f'```py\n{formatted_error}\n```')
-                app_info = await client.application_info()
-                embed.set_footer(text=f'Please contact {app_info.owner} for help.')
-                await ctx.reply(embed=embed)
+            embed = discord.Embed(color=0xff0000, title='Error', description=f'```py\n{formatted_error}\n```')
+            app_info = await client.application_info()
+            embed.set_footer(text=f'Please contact {app_info.owner} for help.')
+            await ctx.reply(embed=embed)
 
         @client.event
         async def on_error(event, *args):
@@ -132,8 +131,17 @@ async def login():
         @commands.is_owner()
         async def reload(ctx):
             """Reloads the bot's extensions."""
+            print(ctx.command.has_error_handler())
             logger.info('Reload command called! Reloading bot...')
-            await ctx.reply('This will do something in the future. For now, test to see that it\'s actually logging something!')
+            status_message = await ctx.reply('Reloading bot...')
+            for extension in dict(client.extensions):  # create a copy of the mapping
+                try:
+                    await client.reload_extension(extension)
+                except commands.ExtensionFailed as e:
+                    await status_message.edit(content=f'{status_message.content}\n{extension}: ❌')
+                    raise e.original from None
+                else:
+                    await status_message.edit(content=f'{status_message.content}\n{extension}: ✅')
             logger.info('Bot reloaded!')
 
         await client.load_extension('cogs.team_management')
@@ -143,6 +151,10 @@ async def login():
             print('Invalid token!', file=sys.stderr)
         finally:
             await client.close()
+
+        @reload.error  # this isn't triggering has_error_handler() for some reason right now
+        async def reload_error(ctx, error):
+            print('bruh')
 
 
 if __name__ == '__main__':
