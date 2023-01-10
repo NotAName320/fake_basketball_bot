@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import asyncio
 import discord
 from discord.ext import commands
 
@@ -32,14 +33,8 @@ class TeamManagement(commands.Cog, name='Team Management'):
     @commands.group()
     async def team(self, ctx, team_id: str):
         team_id = team_id.lower()
-        # if team_id == 'list':
-        #     team_pages = commands.Paginator(max_size=1000)
-        #     teams = list(await self.bot.db.execute_fetchall('SELECT id, name FROM teams'))
-        #     teams.sort(key=lambda a: a[0])
-        #     for team in teams:
-        #         team_pages.add_line(f'{team[0]}: {team[1]}')
-        #     embed = discord.Embed(title=f'Team ID List', description=team_pages.pages, color=0)
-        #     return
+        if team_id in ['list']:
+            return await ctx.invoke(self.bot.get_command(f'team {team_id}'))
         if ctx.invoked_subcommand is None:
             return await ctx.reply(f'Please specify a command to perform. See `{self.bot.command_prefix}help team` for more info.')
         self.team_id = team_id
@@ -60,6 +55,43 @@ class TeamManagement(commands.Cog, name='Team Management'):
         embed.add_field(name='Offense', value='None' if team[4] is None else ['5-Out', '4-Out', 'Iso'][team[4]], inline=True)
         embed.add_field(name='Defense', value='None' if team[5] is None else ['1-3-1', 'Man', '2-3'][team[5]], inline=True)
         return await ctx.reply(embed=embed)
+
+    @team.command(name='list')
+    async def team_list(self, ctx):
+        """Returns a list of team IDs."""
+        team_pages = commands.Paginator(max_size=300)
+        teams = list(await self.bot.db.execute_fetchall('SELECT id, name FROM teams'))
+        teams.sort(key=lambda a: a[0])
+        for team in teams:
+            team_pages.add_line(f'{team[0]}: {team[1]}')
+
+        embed = discord.Embed(title=f'Team ID List', description=team_pages.pages[0], color=0)
+        message = await ctx.reply(embed=embed)
+
+        def reaction_check(reaction, user):  # whittles down all reactions to only the ones that it's looking for.
+            return all((reaction.message == message, user == ctx.author, reaction.emoji in ['⬅️', '➡️', '❌']))
+
+        await message.add_reaction('⬅️')
+        await message.add_reaction('➡️')
+        await message.add_reaction('❌')
+
+        i = 0
+        while True:
+            try:
+                user_reaction = await self.bot.wait_for('reaction_add', timeout=600, check=reaction_check)
+            except asyncio.TimeoutError:
+                return await message.clear_reactions()
+            user_reaction = user_reaction[0]
+            if user_reaction.emoji == '❌':
+                return await message.clear_reactions()
+            if user_reaction.emoji == '⬅️':
+                i = len(team_pages.pages) - 1 if i == 0 else i - 1  # wraparound
+            if user_reaction.emoji == '➡️':
+                i = 0 if i == len(team_pages.pages) - 1 else i + 1
+            embed = discord.Embed(title=f'Team ID List', description=team_pages.pages[i], color=0)
+            embed.set_footer(text=f'Page {i + 1} of {len(team_pages.pages)}')
+            await message.edit(embed=embed)
+            await user_reaction.remove(ctx.author)
 
 
 async def setup(bot: Bot):
