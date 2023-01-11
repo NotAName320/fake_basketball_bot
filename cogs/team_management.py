@@ -96,7 +96,7 @@ class TeamManagement(commands.Cog, name='Team Management'):
                 i = len(team_pages.pages) - 1 if i == 0 else i - 1  # wraparound
             if user_reaction.emoji == '➡️':
                 i = 0 if i == len(team_pages.pages) - 1 else i + 1
-            embed.description = (team_pages.pages[i])
+            embed.description = team_pages.pages[i]
             embed.set_footer(text=f'Page {i + 1} of {len(team_pages.pages)}')
             await message.edit(embed=embed)
 
