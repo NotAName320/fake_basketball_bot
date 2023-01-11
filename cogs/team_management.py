@@ -24,6 +24,8 @@ from discord.ext import commands
 
 from bot import Bot
 
+RESERVED_IDS = ['list', 'create', 'edit']
+
 
 class TeamManagement(commands.Cog, name='Team Management'):
     """Create, manage, and delete teams."""
@@ -35,7 +37,7 @@ class TeamManagement(commands.Cog, name='Team Management'):
     @commands.group()
     async def team(self, ctx, team_id: str):
         self.team_id = team_id.lower()
-        if self.team_id in ['list', 'create']:
+        if self.team_id in RESERVED_IDS:
             # swap two fields
             if len(ctx.message.content.split(' ')) > 2:
                 self.team_id = ctx.message.content.split(' ')[2].lower()
@@ -83,7 +85,7 @@ class TeamManagement(commands.Cog, name='Team Management'):
         i = 0
         while True:
             try:
-                user_reaction = await self.bot.wait_for('reaction_add', timeout=600, check=reaction_check)
+                user_reaction = await self.bot.wait_for('reaction_add', timeout=60, check=reaction_check)
             except asyncio.TimeoutError:
                 return await message.clear_reactions()
             user_reaction = user_reaction[0]
@@ -101,6 +103,10 @@ class TeamManagement(commands.Cog, name='Team Management'):
     @team.command(name='create')
     async def team_create(self, ctx, team_id: Optional[str] = None):
         team_id = team_id or self.team_id
+        if team_id == 'create':
+            return await ctx.reply('Please specify a team ID.')
+        if team_id in RESERVED_IDS:
+            return await ctx.reply(f'Error: {team_id} is a reserved word.')
         if int(await self.bot.fetchval('SELECT EXISTS(SELECT 1 FROM teams WHERE id = ?)', (team_id,))):
             return await ctx.reply('Team with ID already exists.')
         await self.bot.db.execute('INSERT INTO teams VALUES(?, NULL, NULL, NULL, NULL, NULL)', (team_id,))
@@ -113,6 +119,10 @@ class TeamManagement(commands.Cog, name='Team Management'):
         embed.add_field(name='Offense', value='None', inline=True)
         embed.add_field(name='Defense', value='None', inline=True)
         return await ctx.reply(content='Team successfully created.', embed=embed)
+
+    @team.command(name='edit')
+    async def team_edit(self, ctx, team_id: Optional[str] = None):
+        return await ctx.reply(f'Please specify what field to edit.')
 
 
 async def setup(bot: Bot):
