@@ -89,6 +89,7 @@ class TeamManagement(commands.Cog, name='Team Management'):
             except asyncio.TimeoutError:
                 return await message.clear_reactions()
             user_reaction = user_reaction[0]
+            await user_reaction.remove(ctx.author)
             if user_reaction.emoji == '❌':
                 return await message.clear_reactions()
             if user_reaction.emoji == '⬅️':
@@ -98,7 +99,6 @@ class TeamManagement(commands.Cog, name='Team Management'):
             embed.description = (team_pages.pages[i])
             embed.set_footer(text=f'Page {i + 1} of {len(team_pages.pages)}')
             await message.edit(embed=embed)
-            await user_reaction.remove(ctx.author)
 
     @team.command(name='create')
     async def team_create(self, ctx, team_id: Optional[str] = None):
