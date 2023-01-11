@@ -101,7 +101,6 @@ class TeamManagement(commands.Cog, name='Team Management'):
     @team.command(name='create')
     async def team_create(self, ctx, team_id: Optional[str] = None):
         team_id = team_id or self.team_id
-        print(team_id)
         if int(await self.bot.fetchval('SELECT EXISTS(SELECT 1 FROM teams WHERE id = ?)', (team_id,))):
             return await ctx.reply('Team with ID already exists.')
         await self.bot.db.execute('INSERT INTO teams VALUES(?, NULL, NULL, NULL, NULL, NULL)', (team_id,))
