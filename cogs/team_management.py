@@ -120,9 +120,42 @@ class TeamManagement(commands.Cog, name='Team Management'):
         embed.add_field(name='Defense', value='None', inline=True)
         return await ctx.reply(content='Team successfully created.', embed=embed)
 
-    @team.command(name='edit')
-    async def team_edit(self, ctx, team_id: Optional[str] = None):
-        return await ctx.reply(f'Please specify what field to edit.')
+    @team.group(name='edit')
+    @commands.has_role('Bot Access')
+    async def team_edit(self, ctx):
+        if ctx.invoked_subcommand is None:
+            return await ctx.reply(f'Command used incorrectly. Consult `{self.bot.command_prefix}help team edit` for more info.')
+
+    @team_edit.command(name='name')
+    @commands.has_role('Bot Access')
+    async def edit_name(self, ctx, name: str):
+        team_id = self.team_id
+        if int(await self.bot.fetchval('SELECT NOT EXISTS(SELECT 1 FROM teams WHERE id = ?)', (team_id,))):
+            return await ctx.reply('Team ID does not exist.')
+        await self.bot.db.execute('UPDATE teams SET name = ? WHERE id = ?', (name, team_id))
+        await self.bot.db.commit()
+        return await ctx.reply(f'Success. {team_id}\'s name successfully set to {name}.')
+
+    @team_edit.command(name='mascot')
+    @commands.has_role('Bot Access')
+    async def edit_mascot(self, ctx, mascot: str):
+        team_id = self.team_id
+        if int(await self.bot.fetchval('SELECT NOT EXISTS(SELECT 1 FROM teams WHERE id = ?)', (team_id,))):
+            return await ctx.reply('Team ID does not exist.')
+        await self.bot.db.execute('UPDATE teams SET mascot = ? WHERE id = ?', (mascot, team_id))
+        await self.bot.db.commit()
+        return await ctx.reply(f'Success. {team_id}\'s mascot successfully set to {mascot}.')
+
+    @team_edit.command(name='coach')
+    @commands.has_role('Bot Access')
+    async def edit_coach(self, ctx, coach: discord.Member):
+        team_id = self.team_id
+        coach_id = coach.id
+        if int(await self.bot.fetchval('SELECT NOT EXISTS(SELECT 1 FROM teams WHERE id = ?)', (team_id,))):
+            return await ctx.reply('Team ID does not exist.')
+        await self.bot.db.execute('UPDATE teams SET coach = ? WHERE id = ?', (coach_id, team_id))
+        await self.bot.db.commit()
+        return await ctx.reply(f'Success. {team_id}\'s coach successfully set to {coach.mention}.')
 
 
 async def setup(bot: Bot):

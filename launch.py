@@ -127,9 +127,9 @@ async def login():
             print(exception, file=sys.stderr)
             logger.error(exception)
 
-        @client.command()
+        @client.command(name='reload')
         @commands.is_owner()
-        async def reload(ctx):
+        async def reload_cogs(ctx):
             """Reloads the bot's extensions."""
             logger.info('Reload command called! Reloading bot...')
             status_message = await ctx.reply('Reloading bot...')
@@ -151,7 +151,7 @@ async def login():
         finally:
             await client.close()
 
-        @reload.error  # this isn't triggering has_error_handler() for some reason right now
+        @reload_cogs.error  # this isn't triggering has_error_handler() for some reason right now
         async def reload_error(ctx, error):
             print('bruh')
 
